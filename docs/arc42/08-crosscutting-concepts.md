@@ -175,7 +175,7 @@ The same declarative manifest is accepted via three interchangeable channels; ve
 
 ### 8.4.2 Asset-Bundle Pattern
 
-Non-firmware assets (error-code dictionaries, translations, filament/calibration databases, ML models, ROS parameter sets) ride the **same** manifest pipeline as firmware — they are simply manifests whose deployment steps compose `FILE_TRANSFER` + `SCRIPT_EXECUTION`/`SYSTEM_SERVICE` (e.g., *"unzip into `/var/lib/app/assets/`, restart the service that rereads them"*). This eliminates the need for a separate asset CDN, gives assets signing / versioning / anti-rollback / audit for free, and keeps a single release cadence and evidence bundle.
+Non-firmware assets (error-code dictionaries, translations, filament/calibration databases, ML models, ROS parameter sets, offline `.deb` package sets, compose descriptors) ride the **same** manifest pipeline as firmware — they are simply manifests whose deployment steps compose `FILE_TRANSFER` + `SCRIPT_EXECUTION`/`SYSTEM_SERVICE`/`DOCKER_CONTAINER` (e.g., *"unzip into `/var/lib/app/assets/`, restart the service that rereads them"*, *"stage a local apt repo snapshot and install selected packages"*, *"pre-pull compose images, then cut over the stack"*). This eliminates the need for separate asset/package/container delivery channels, gives them signing / versioning / anti-rollback / audit for free, and keeps a single release cadence and evidence bundle.
 
 ---
 
@@ -211,7 +211,7 @@ Rollback is expressed as a **`rollback_steps` array in the signed manifest** —
 - For OS-level updates (device profile = ext4 A/B + GRUB): rollback is a `SCRIPT_EXECUTION` of `restore-grubenv.sh` that reverts `boot_part=previous_part`, plus optional re-initialization of the staged bank. If reboot already occurred, the boot-counter handles it (see 8.6.3) — no agent action needed.
 - For Btrfs device profile: rollback is a `SCRIPT_EXECUTION` invoking `btrfs subvolume set-default` against the pre-update snapshot.
 - For application-only updates (UC-02, UC-03): rollback composes `FILE_TRANSFER`/`SCRIPT_EXECUTION`/`SYSTEM_SERVICE` to restore previous artifacts and restart services. The engine snapshots replaced files into `/var/lib/ota-agent/staging/<deployment_id>/rollback/` before each `FILE_TRANSFER` overwriting an existing path, enabling even last-resort local recovery.
-- For Docker-based updates (`DOCKER_CONTAINER` primitive, FR-23): rollback re-pulls the previous image digest and swaps containers atomically.
+- For Docker-based updates (`DOCKER_CONTAINER` primitive, FR-23): rollback re-pulls the previous image digest and swaps containers atomically; for compose-based stacks, rollback re-stages the previous compose inputs, re-pulls the previous digests, and re-runs the signed `docker compose` cutover script.
 
 ### 8.6.3 Boot-Time Rollback (two supported `grubenv` patterns)
 

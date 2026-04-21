@@ -217,10 +217,10 @@ This catalogue lists every functional requirement (FR) for the platform. IDs **F
 
 ### FR-23 — Docker container primitive
 
-- **Statement:** The agent shall implement a `DOCKER_CONTAINER` primitive that can (a) pull an OCI image by digest via the local container engine API, (b) stop the previously running container of the same logical name, and (c) start the new container with manifest-specified arguments, networks, and volumes. The primitive shall verify that the pulled image's digest matches the value declared in the signed manifest before starting the container.
-- **Rationale:** Supports application-level updates for ROS2/robotics deployments (UC-02) without requiring an OS-level update, and makes containerized control-plane adjacent workloads first-class.
+- **Statement:** The agent shall implement a `DOCKER_CONTAINER` primitive that can (a) pull an OCI image by digest via the local container engine API, (b) verify that the pulled image's digest matches the value declared in the signed manifest, and then either (c1) cache that image for a later coordinated cutover or (c2) stop the previously running container of the same logical name and start the new container with manifest-specified arguments, networks, and volumes. Multi-container `docker compose` style deployments shall be expressed as a sequence of digest-pinned image pulls followed by a signed `SCRIPT_EXECUTION`/`SYSTEM_SERVICE` cutover step that performs the controlled `docker compose down` / `docker compose up` (or equivalent) once all required images are present.
+- **Rationale:** Supports both single-container swaps and coordinated multi-service application updates for ROS2/robotics deployments (UC-02) without requiring an OS-level update, and makes containerized control-plane adjacent workloads first-class.
 - **Source:** UC-02; [ADR-0008](../adr/ADR-0008-config-driven-primitive-engine.md).
-- **Verification:** Test (integration) — issue a manifest specifying a `DOCKER_CONTAINER` primitive; assert image digest match, container swap, and rollback on failure.
+- **Verification:** Test (integration) — issue a manifest specifying a `DOCKER_CONTAINER` primitive in both cache-only and container-replace modes; assert image digest match, coordinated compose cutover or container swap, and rollback on failure.
 - **Priority:** Should.
 
 ### FR-24 — Config-driven workflow (hardware independence)
@@ -253,10 +253,10 @@ This catalogue lists every functional requirement (FR) for the platform. IDs **F
 
 ### FR-27 — Offline / air-gapped bundle mode
 
-- **Statement:** The agent shall support applying a deployment from a signed **offline bundle** (a deterministic `.zip` containing `manifest.jws` and an `artifacts/` directory) via three paths: (a) drop-directory `inotify` watch on `/var/lib/ota/bundles/`; (b) authenticated local CLI invocation `ota-agent apply-bundle <path>`; (c) a NATS `desired-state` that references a staged bundle via a `bundle://` URL. All verification rules ([§5.8](../arc42/05-building-block-view.md#58-jws-manifest-envelope-adr-0003--adr-0008)) — including anti-rollback — shall apply identically to the offline path.
+- **Statement:** The agent shall support applying a deployment from a signed **offline bundle** (a deterministic `.zip` containing `manifest.jws` and an `artifacts/` directory) via three paths: (a) drop-directory `inotify` watch on `/var/lib/ota/bundles/`; (b) authenticated local CLI invocation `ota-agent apply-bundle <path>`; (c) a NATS `desired-state` that references a staged bundle via a `bundle://` URL. Offline bundles MAY carry the same artifact mix as online releases, including raw/Yocto/VMDK disk images, signed device-profile scripts, compose descriptors, and offline Debian/Ubuntu package sets (`.deb` payloads plus apt metadata) when the manifest's signed steps know how to consume them. All verification rules ([§5.8](../arc42/05-building-block-view.md#58-jws-manifest-envelope-adr-0003--adr-0008)) — including anti-rollback — shall apply identically to the offline path.
 - **Rationale:** Covers air-gapped medical manufacturing, HIL labs behind data diodes, field service of robots with intermittent WAN, and regulatory environments that mandate offline-only updates.
 - **Source:** [ADR-0011](../adr/ADR-0011-offline-bundle-format.md); Bambu offline OTA zip.
-- **Verification:** Test (integration) — build a bundle from the online pipeline; mount to a device over USB; verify drop-dir pickup, signature check, anti-rollback gate, artifact SHA-256 verification, successful execution; verify `DeploymentAck` is queued in the outbox and replayed on NATS reconnect.
+- **Verification:** Test (integration) — build a bundle from the online pipeline; mount to a device over USB; verify drop-dir pickup, signature check, anti-rollback gate, artifact SHA-256 verification, successful execution of representative image/package/container artifacts, and `DeploymentAck` queuing in the outbox with replay on NATS reconnect.
 - **Priority:** Should.
 
 ### FR-28 — Conditional step execution (`applies_if` predicate)

@@ -33,7 +33,11 @@ device-update-v2.4.0-20261021T134502Z.zip
 ├── manifest.jws                       ← JWS-signed manifest (JCS JSON inside)
 ├── artifacts/
 │   ├── root-v2.4.img                  ← OS image
+│   ├── root-v2.4.vmdk                 ← direct hypervisor disk image
 │   ├── flash-inactive-partition.sh    ← device-profile script
+│   ├── docker-compose.yml             ← compose stack descriptor
+│   ├── app_2.4.0_amd64.deb            ← offline apt package payload
+│   ├── Packages.gz                    ← apt metadata snapshot
 │   ├── update-grubenv.sh
 │   ├── restore-grubenv.sh
 │   └── <one file per manifest step_ref>
@@ -47,6 +51,7 @@ Properties:
 - **No artifact encryption in v1.** Confidentiality, if required, is delegated to bundle-level transport (e.g., encrypted USB drive); see §11 tech-debt for a post-v1 proposal to add AEAD-at-rest per artifact.
 - Filenames include both semantic version and a UTC build timestamp (`v2.4.0-20261021T134502Z`) to reject out-of-order releases without trusting filesystem clocks.
 - `BUNDLE.toml` is unsigned human-readable metadata (build host, CI run URL, release notes). It is **not** consulted during verification.
+- Bundles are intentionally **artifact-agnostic**: the signed manifest may reference raw/Yocto/VMDK disk images, device-profile scripts, compose descriptors, OCI-related metadata, or offline Debian/Ubuntu package sets (`.deb` plus apt index files), provided the referenced steps consume them through the existing primitive set.
 
 ### `bundle://` Transport Scheme
 
