@@ -780,7 +780,7 @@ Each profile's scripts decide how to turn an **artifact** (fetched via `FILE_TRA
 
 The artifact format is a **device-profile concern**, not an agent concern. Adding support for a new format is a new script in a profile library; no agent release.
 
-**Compose-oriented container rollout note.** Multi-service Docker workloads do not require a dedicated new primitive. The manifest can stage a signed `docker-compose.yml` / `.env`, pre-pull each pinned OCI image via `DOCKER_CONTAINER` in `mode: "cache_only"`, and then execute a final signed cutover script that runs `docker compose down` followed by `docker compose up -d` (or `docker compose up -d --remove-orphans`) once all referenced images are present. This preserves digest pinning while keeping the coordinated restart policy in manifest-authored workflow logic.
+**Compose-oriented container rollout note.** Multi-service Docker workloads do not require a dedicated new primitive. The manifest can stage a signed `docker-compose.yml` / `.env`, pre-pull each pinned OCI image via `DOCKER_CONTAINER` in `mode: "cache_only"`, and then execute a final signed cutover script that runs `docker compose down` followed by `docker compose up -d` (or `docker compose up -d --remove-orphans`) once all referenced images are present. To preserve digest pinning / offline behavior, the staged compose file MUST reference images by digest (for example, `image: repo@sha256:...`); otherwise the cutover script MUST retag the cached digest to the tag expected by the compose file and invoke Compose with pull disabled (for example, `docker compose up -d --pull=never`). This keeps the coordinated restart policy in manifest-authored workflow logic without implying that tag-based Compose references are immutable.
 
 ---
 
