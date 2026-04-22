@@ -358,7 +358,7 @@ No Turing-complete expressions; no external references; evaluable against a stat
 | `SCRIPT_EXECUTION` | Fork/exec a signed script from the manifest. | `interpreter`, `script_ref` or `script_body`, `script_sha256`, optional `env`, `working_dir` |
 | `FILE_TRANSFER` | Resumable HTTPS download with SHA-256 verify. | `url`, `sha256`, `dest_path`, `resumable` (bool) |
 | `SYSTEM_SERVICE` | systemd unit `start`/`stop`/`restart` with readiness probe. | `unit_name`, `action`, optional `readiness_timeout_seconds`, `readiness_probe` |
-| `DOCKER_CONTAINER` | Pull OCI image by digest, then either cache it for a coordinated cutover or swap a single container atomically. *(FR-23)* | `image_ref`, `image_digest`, `mode`, optional `container_name`, `args`, `networks`, `volumes` |
+| `DOCKER_CONTAINER` | Pull OCI image by digest, then either cache it for a coordinated cutover or swap a single container atomically. *(FR-23)* | `image_ref`, `image_digest`, `mode` where `mode ∈ { cache_only, replace }`. For `cache_only`: no additional fields are required and `container_name`, `args`, `networks`, `volumes` are ignored. For `replace`: `container_name` is required; `args`, `networks`, and `volumes` are optional runtime settings for the replacement container. |
 | `AGENT_SELF_UPDATE` | Atomic binary swap + `systemctl restart ota-agent`. *(FR-19)* | `url`, `sha256`, `target_architecture`, `binary_signature` |
 | `REBOOT` | Controlled reboot. | `grace_seconds` |
 
