@@ -93,7 +93,7 @@ flowchart TB
     AgentA -->|"systemctl, file ops"| ROS
 
     AgentB <-->|"NATS over mTLS\n(WAN)"| NATSHub
-    AgentB -->|"writes inactive partition,\nupdates grubenv"| GRUB
+    AgentB -->|"executes signed device-profile\nscripts (SCRIPT_EXECUTION)"| GRUB
 
     AgentA -->|"HTTPS GET"| Artifact
     AgentB -->|"HTTPS GET"| Artifact
@@ -113,7 +113,7 @@ flowchart TB
 
 - The Go control plane (API, Claim Registry, Audit, RBAC, State Store coordination).
 - The NATS cluster configuration, mTLS PKI for messaging.
-- The Rust edge agent (NATS client, manifest verifier, execution engine, partition manager, GRUB manager, telemetry, self-updater).
+- The Rust edge agent (NATS client, manifest verifier, config-driven primitive execution engine, primitive set per [ADR-0008](../adr/ADR-0008-config-driven-primitive-engine.md), telemetry, self-updater). OS-specific behaviour (partitioning, bootloader, snapshots) is delivered as **signed device-profile scripts** invoked through the `SCRIPT_EXECUTION` primitive — it is **not** compiled into the agent.
 - The signed manifest schema (Protobuf + JWS envelope).
 - The bootloader integration (GRUB scripts, `grubenv` variables, boot-counter).
 

@@ -151,7 +151,7 @@ flowchart LR
 
 ### 8.3.4 Graceful Degradation
 
-- If the artifact store is unreachable, `DownloadArtifact` retries with backoff; the deployment remains in `Executing` and is not marked failed until a per-step timeout expires.
+- If the artifact store is unreachable, a `FILE_TRANSFER` step retries with backoff; the deployment remains in `Executing` and is not marked failed until a per-step timeout expires.
 - If signature verification fails (FR-10), the agent does **not** retry the same manifest; it requires a new signed publish.
 
 ---

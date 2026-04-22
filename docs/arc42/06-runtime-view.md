@@ -122,15 +122,15 @@ sequenceDiagram
     LEAF-->>AGENT: JWS envelope
     AGENT->>AGENT: verify signature
 
-    AGENT->>ROS: systemctl stop ros2-app.service (RunScript)
+    AGENT->>ROS: systemctl stop ros2-app.service (SCRIPT_EXECUTION)
     AGENT->>LEAF: publish StepResult
-    AGENT->>ART: GET model_v3.bin (resumable)
+    AGENT->>ART: GET model_v3.bin (FILE_TRANSFER, resumable)
     Note right of AGENT: link drops; agent retries with backoff
     AGENT->>ART: GET model_v3.bin (resume from offset)
     AGENT->>LEAF: publish StepResult
-    AGENT->>AGENT: atomic symlink swap (RunCommand)
+    AGENT->>AGENT: atomic symlink swap (SCRIPT_EXECUTION)
     AGENT->>LEAF: publish StepResult
-    AGENT->>ROS: systemctl restart ros2-app.service (SystemdRestart)
+    AGENT->>ROS: systemctl restart ros2-app.service (SYSTEM_SERVICE)
     AGENT->>ROS: poll until active (within readiness timeout)
     AGENT->>LEAF: publish StepResult{success=true}
     AGENT->>LEAF: publish DeploymentAck (signed)

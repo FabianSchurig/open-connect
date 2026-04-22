@@ -29,6 +29,8 @@ The structure follows the [arc42](https://arc42.org/) architecture template, com
 | 15 | [Architectural Decision Records](adr/) | Full ADR documents. |
 | 16 | [Traceability Matrix](requirements/traceability-matrix.md) | UC ↔ FR/NFR ↔ arc42 ↔ Epic/Task ↔ ADR. |
 
+The current catalogue covers **FR-01 … FR-30**, **NFR-01 … NFR-16**, **UC-01 … UC-03**, and **ADR-0001 … ADR-0011**.
+
 ---
 
 ## Document Conventions

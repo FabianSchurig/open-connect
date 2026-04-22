@@ -551,8 +551,8 @@ All endpoints mTLS + JWT, `Content-Type: application/json`. Versioned under `/v1
 
 | Method | Path | Body | Returns | RBAC |
 |--------|------|------|---------|------|
-| `PUT`  | `/v1/desired-state/by-serial/{serial}` | `{jws_envelope}` (Protobuf payload base64url) | `202 {deployment_id}` | `release:publish` |
-| `PUT`  | `/v1/desired-state/by-tag/{tag}`       | `{jws_envelope}`                              | `202 {deployment_id, target_count}` | `release:publish` |
+| `PUT`  | `/v1/desired-state/by-serial/{serial}` | `{jws_envelope}` (JWS Compact over JCS-canonicalized JSON payload — see [§5.4.1](#541-manifest--json-schema-sketch-jws-payload), [§5.8](#58-detailed-design--jws-manifest-envelope)) | `202 {deployment_id}` | `release:publish` |
+| `PUT`  | `/v1/desired-state/by-tag/{tag}`       | `{jws_envelope}` (as above)                              | `202 {deployment_id, target_count}` | `release:publish` |
 | `GET`  | `/v1/desired-state/{deployment_id}`    | — | `200 {deployment, per_device_status}` | `release:read` |
 
 ### Claims

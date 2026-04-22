@@ -4,8 +4,8 @@ This catalogue captures the contractual functional and non-functional requiremen
 
 ## Index
 
-- [Functional Requirements](functional.md) — `FR-01` through `FR-22` (10 baseline + 12 derived).
-- [Non-Functional Requirements](non-functional.md) — `NFR-01` through `NFR-14` (4 baseline + 10 derived).
+- [Functional Requirements](functional.md) — `FR-01` through `FR-30`.
+- [Non-Functional Requirements](non-functional.md) — `NFR-01` through `NFR-16`.
 - [Traceability Matrix](traceability-matrix.md) — UC ↔ FR/NFR ↔ arc42 ↔ Epic/Task ↔ ADR.
 
 ## Authoring Rules

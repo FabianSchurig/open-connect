@@ -87,7 +87,7 @@ Each NFR is paired with a measurable **Quality Scenario** in [arc42 §10](../arc
 
 ### NFR-07 — Resumable artifact downloads *(from UC-02)*
 
-- **Statement:** The `DownloadArtifact` step shall support resumable downloads (HTTP `Range`) when the artifact server advertises support, to bound bandwidth waste on flaky links.
+- **Statement:** The `FILE_TRANSFER` primitive (formerly named `DownloadArtifact` in pre-[ADR-0008](../adr/ADR-0008-config-driven-primitive-engine.md) drafts) shall support resumable downloads (HTTP `Range`) when the artifact server advertises support, to bound bandwidth waste on flaky links.
 - **Rationale:** Re-downloading a 2 GB model after a 90 % completion drop is unacceptable on cellular.
 - **Source:** UC-02 Alt-1.
 - **Verification:** Test — drop connection mid-download, assert resume-from-offset.
