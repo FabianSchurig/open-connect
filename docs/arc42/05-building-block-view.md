@@ -358,7 +358,7 @@ No Turing-complete expressions; no external references; evaluable against a stat
 | `SCRIPT_EXECUTION` | Fork/exec a signed script from the manifest. | `interpreter`, `script_ref` or `script_body`, `script_sha256`, optional `env`, `working_dir` |
 | `FILE_TRANSFER` | Resumable HTTPS download with SHA-256 verify. | `url`, `sha256`, `dest_path`, `resumable` (bool) |
 | `SYSTEM_SERVICE` | systemd unit `start`/`stop`/`restart` with readiness probe. | `unit_name`, `action`, optional `readiness_timeout_seconds`, `readiness_probe` |
-| `DOCKER_CONTAINER` | Pull OCI image by digest, swap container atomically. *(FR-23)* | `image_ref`, `image_digest`, `container_name`, `args`, `networks`, `volumes` |
+| `DOCKER_CONTAINER` | Pull OCI image by digest, then either cache it for a coordinated cutover or swap a single container atomically. *(FR-23)* | `image_ref`, `image_digest`, `mode` where `mode ∈ { cache_only, replace }`. For `cache_only`: no additional fields are required and `container_name`, `args`, `networks`, `volumes` are ignored. For `replace`: `container_name` is required; `args`, `networks`, and `volumes` are optional runtime settings for the replacement container. |
 | `AGENT_SELF_UPDATE` | Atomic binary swap + `systemctl restart ota-agent`. *(FR-19)* | `url`, `sha256`, `target_architecture`, `binary_signature` |
 | `REBOOT` | Controlled reboot. | `grace_seconds` |
 
@@ -741,14 +741,16 @@ Two physical disks; each is an independent bootable system. The primary GRUB (on
 
 Each profile's scripts decide how to turn an **artifact** (fetched via `FILE_TRANSFER`) into a bootable disk/partition/subvolume. The agent itself never parses artifact bytes — any of these are valid artifact formats for a profile script to consume:
 
-| Format | Typical source | Flashing mechanism | Host capability(ies) |
-|--------|---------------|--------------------|--------------------|
+| Format | Typical source | Consumption mechanism | Host capability(ies) |
+|--------|---------------|-----------------------|--------------------|
 | Raw disk / partition image (`.img`) | Hand-built images, `dd`-of-a-reference-device | `dd` | `dd` (baseline) |
 | Compressed raw (`.img.xz`, `.img.zst`) | CI pipelines that save bandwidth | Stream-decompress `|` `dd` | `xz` / `zstd` |
 | **Yocto `.wic`** (whole image with partition table) | Yocto `image-wic.bbclass` output | `dd` directly, or `bmaptool copy` with a paired `.bmap` for sparse writes | `dd` baseline; `bmaptool` for sparse/efficient path |
 | **Yocto `.wic.bz2` / `.wic.gz` / `.wic.xz` / `.wic.zst`** (+ optional `.bmap`) | Yocto default compressed output | `bmaptool copy` handles decompression + sparse write natively; fallback is stream-decompress → `dd` | `bmaptool` (preferred for Yocto); otherwise the matching decompressor |
-| VMDK inside an OVA | Hypervisor-built golden images (the field prototype's shape) | Unpack OVA → attach VMDK via `qemu-nbd` → `dd` | `qemu-nbd` + `nbd` kernel module |
+| Standalone VMDK (`.vmdk`) | Hypervisor-exported golden disk image | Attach VMDK via `qemu-nbd` → `dd` | `qemu-nbd` + `nbd` kernel module |
+| VMDK inside an OVA (`.ova`) | Appliance-style hypervisor export | Unpack OVA → attach VMDK via `qemu-nbd` → `dd` | `tar`, `qemu-nbd` + `nbd` kernel module |
 | Tarball of a rootfs (`.tar`, `.tar.zst`) | Minimal-rootfs workflows; initramfs-only updates | Format target filesystem → `tar -xpf` into it | `tar`, matching decompressor |
+| Debian/Ubuntu offline package set (`.deb` + `Packages*` / `Release`) | Air-gapped app or dependency updates | Stage local repo or package set → `apt-get` / `dpkg -i` via signed script | `apt`, `dpkg` |
 | OCI container image | Application updates, Docker/Podman workloads | Pulled and swapped by the `DOCKER_CONTAINER` primitive (§5.4) — not a `SCRIPT_EXECUTION` concern | `docker` or `podman` |
 
 **Yocto .wic + bmaptool note.** `.wic` is Yocto's native "image-with-partition-table" output; paired with a signed `.bmap` file it enables sparse writes via `bmaptool` — skipping empty regions of the image and significantly reducing flash time on eMMC / SD-card / SSD targets. Both the `.wic(.zst|.xz|.gz|.bz2)` **and** the `.bmap` MUST appear in the manifest's top-level `artifacts[]` pin index ([FR-29](../requirements/functional.md#fr-29--manifest-level-artifact-pin-index)), and the script's destructive-operation safety interlock ([FR-30](../requirements/functional.md#fr-30--device-profile-script-authoring-conventions)) still applies to the `bmaptool copy` target. A Yocto-built device class typically declares `bmaptool` as a required capability on its flash step:
@@ -777,6 +779,8 @@ Each profile's scripts decide how to turn an **artifact** (fetched via `FILE_TRA
 ```
 
 The artifact format is a **device-profile concern**, not an agent concern. Adding support for a new format is a new script in a profile library; no agent release.
+
+**Compose-oriented container rollout note.** Multi-service Docker workloads do not require a dedicated new primitive. The manifest can stage a signed `docker-compose.yml` / `.env`, pre-pull each pinned OCI image via `DOCKER_CONTAINER` in `mode: "cache_only"`, and then execute a final signed cutover script that runs `docker compose down` followed by `docker compose up -d` (or `docker compose up -d --remove-orphans`) once all referenced images are present. To preserve digest pinning / offline behavior, the staged compose file MUST reference images by digest (for example, `image: repo@sha256:...`); otherwise the cutover script MUST retag the cached digest to the tag expected by the compose file and invoke Compose with pull disabled (for example, `docker compose up -d --pull=never`). This keeps the coordinated restart policy in manifest-authored workflow logic without implying that tag-based Compose references are immutable.
 
 ---
 
@@ -821,7 +825,7 @@ The artifact format is a **device-profile concern**, not an agent concern. Addin
 | `SCRIPT_EXECUTION` | `fork(2) + exec(2)` against a file under `/var/lib/ota/spool/` labeled `ota_update_script_t` by `type_transition` rules. | `grub2-editenv` toggle, `dd`-equivalent partition write, Btrfs `subvolume snapshot`, ext4 `fsck`, UKI staging. |
 | `FILE_TRANSFER` | HTTPS GET with `Range` resume, streamed to dest path, `fsync`, SHA-256 verify. | Downloading root-image `.img` / OCI tarballs / firmware blobs. |
 | `SYSTEM_SERVICE` | `systemctl <action> <unit>` + `systemctl is-active --wait` with timeout. | `ros2-app.service`, `docker.service`. |
-| `DOCKER_CONTAINER` | Docker/containerd engine API socket (labeled `container_var_run_t`); narrow SELinux rule for `ota_agent_t`. | `pull @sha256:...`, `stop`, `run --name` swap. |
+| `DOCKER_CONTAINER` | Docker/containerd engine API socket (labeled `container_var_run_t`); narrow SELinux rule for `ota_agent_t`. | `pull @sha256:...`, optional cache-only pre-pull, `stop`, `run --name` swap. |
 | `AGENT_SELF_UPDATE` | Stage to `/usr/local/lib/ota-agent/agent.new`, atomic `rename(2)`, `systemctl restart ota-agent`. | See [§6.5](06-runtime-view.md#65-agent-self-update). |
 | `REBOOT` | `systemctl reboot` after `grace_seconds` countdown, publishing last telemetry. | — |
 

@@ -28,9 +28,41 @@ Refactor the agent's execution model to a **small, fixed set of generic primitiv
 | `SCRIPT_EXECUTION` | Run a shell / interpreter script staged from the manifest. | interpreter, signed script body, env, cwd, timeout |
 | `FILE_TRANSFER` | Download a file (with checksum, resumable HTTP `Range`) and place it at a target path. | source URL, SHA-256, dest path, mode |
 | `SYSTEM_SERVICE` | Start / stop / restart a systemd (or SysV) unit with a readiness probe. | unit name, action, readiness condition, timeout |
-| `DOCKER_CONTAINER` | Pull an OCI image, stop the previous container, start the new one. ([FR-23](../requirements/functional.md#fr-23--docker-container-primitive)) | image ref, digest, container name, args, networks |
+| `DOCKER_CONTAINER` | Pull an OCI image, then either cache it for later cutover or stop the previous container and start the new one. ([FR-23](../requirements/functional.md#fr-23--docker-container-primitive)) | image ref, digest, `mode` (`CACHE_ONLY` \| `RECREATE`), plus mode-specific parameters defined below |
 | `AGENT_SELF_UPDATE` | Atomic binary swap + `systemctl restart ota-agent`. ([FR-19](../requirements/functional.md#fr-19--agent-self-update-from-brief-deliverable-53)) | source URL, SHA-256, signature |
 | `REBOOT` | Controlled reboot with grace period. | grace seconds |
+
+#### `DOCKER_CONTAINER` contract (normative)
+
+The `DOCKER_CONTAINER.parameters.mode` field is a required enum with the following allowed values:
+
+- `CACHE_ONLY`: pull and verify the OCI image into the local container runtime cache, but do **not** stop, remove, create, or start any container.
+- `RECREATE`: pull and verify the OCI image, then replace the running container by stopping/removing the previous instance and creating/starting a new one from the supplied image and runtime settings.
+
+Common parameter requirements for all `DOCKER_CONTAINER` steps:
+
+- `image_ref` — **required**; OCI image reference to pull.
+- `digest` — **required**; immutable image digest that **must** match the pulled image.
+- `mode` — **required**; one of `CACHE_ONLY` or `RECREATE`.
+
+Conditional parameter requirements:
+
+- When `mode = CACHE_ONLY`:
+  - `container_name` — **ignored** if provided.
+  - `args` — **ignored** if provided.
+  - `networks` — **ignored** if provided.
+  - Runtime-specific container creation fields added in future revisions — **ignored** unless explicitly defined for `CACHE_ONLY`.
+- When `mode = RECREATE`:
+  - `container_name` — **required**; name of the container instance to replace/create.
+  - `args` — **optional**; command arguments / runtime arguments for the new container. If omitted, the image default command is used.
+  - `networks` — **optional**; list of networks to attach to the new container. If omitted, the runtime default network behavior applies.
+
+Validation and execution rules:
+
+- A manifest using any `mode` value other than `CACHE_ONLY` or `RECREATE` is invalid.
+- In `CACHE_ONLY`, supplying `container_name`, `args`, or `networks` does not change behavior and must not trigger container replacement.
+- In `RECREATE`, omission of `container_name` is a validation error.
+- Both modes must fail the step if the pulled image does not resolve to `digest`.
 
 No primitive has knowledge of partitions, bootloaders, filesystems, or distro conventions. A full A/B OS update is expressed as a *composition* of primitives in the JSON manifest:
 
@@ -86,6 +118,7 @@ Registering a new primitive is a compile-time operation **in the agent**; the ma
 
 - **True hardware independence.** The same `aarch64-unknown-linux-musl` binary runs on Yocto-built medical devices, Ubuntu-based robots, and Debian/RHEL HIL rigs. → [NFR-15](../requirements/non-functional.md#nfr-15--distribution-agnostic-single-binary).
 - **Dynamic workflows.** Migrating ext4→Btrfs, or GRUB→systemd-boot, is a **manifest** change, not an **agent** change. Fleet can adopt new OS strategies without an agent redeploy.
+- **Compose-style cutovers stay declarative.** The agent only needs digest-pinned image pull/cutover primitives; staged `docker compose down` / `up` workflows remain signed manifest logic rather than a separate hard-coded subsystem.
 - **Smaller compiled surface.** The Rust agent has six primitives to test; every new distro/workflow adds 0 lines of Rust.
 - **Cleaner security model.** The agent's SELinux confinement (see [ADR-0006](ADR-0006-selinux-strict-policy.md)) is tied to primitives, not specific workflows. "Allowed system calls" becomes a finite, auditable set.
 - **Encourages script reuse.** Device profiles are libraries of signed scripts; the manifest composes them.
