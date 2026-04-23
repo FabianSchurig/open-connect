@@ -52,25 +52,25 @@ pub fn transition(from: AgentState, event: Event) -> Result<AgentState, Transiti
     use AgentState::*;
     use Event::*;
     let next = match (from, event) {
-        (Idle, PollTick)             => Polling,
+        (Idle, PollTick) => Polling,
         (Polling, DesiredStateReceived) => Verifying,
-        (Polling, PollTick)          => Polling,
-        (Verifying, VerifyOk)        => Executing,
-        (Verifying, VerifyFail)      => Idle,
-        (Executing, StepsOk)         => Validating,
-        (Executing, StepsFail)       => RollingBack,
+        (Polling, PollTick) => Polling,
+        (Verifying, VerifyOk) => Executing,
+        (Verifying, VerifyFail) => Idle,
+        (Executing, StepsOk) => Validating,
+        (Executing, StepsFail) => RollingBack,
         (Executing, RebootRequested) => Rebooting,
         (Rebooting, RebootCompleted) => Validating,
-        (Validating, HealthOk)       => Idle,
-        (Validating, HealthFail)     => RollingBack,
-        (RollingBack, StepsOk)       => Idle,
-        (RollingBack, StepsFail)     => Idle, // give up; agent stays alive
-        (Idle, ClaimGranted)         => Preparing,
-        (Preparing, PreparationOk)   => Ready,
+        (Validating, HealthOk) => Idle,
+        (Validating, HealthFail) => RollingBack,
+        (RollingBack, StepsOk) => Idle,
+        (RollingBack, StepsFail) => Idle, // give up; agent stays alive
+        (Idle, ClaimGranted) => Preparing,
+        (Preparing, PreparationOk) => Ready,
         (Preparing, PreparationFail) => Idle,
-        (Ready, InUseStarted)        => InUse,
-        (Ready, Released)            => Idle,
-        (InUse, Released)            => Idle,
+        (Ready, InUseStarted) => InUse,
+        (Ready, Released) => Idle,
+        (InUse, Released) => Idle,
         _ => return Err(TransitionError::Illegal { from, event }),
     };
     Ok(next)
@@ -130,7 +130,10 @@ mod tests {
             (Ready, PollTick),
             (InUse, ClaimGranted),
         ] {
-            assert!(transition(from, event).is_err(), "expected illegal: {from:?} on {event:?}");
+            assert!(
+                transition(from, event).is_err(),
+                "expected illegal: {from:?} on {event:?}"
+            );
         }
     }
 }

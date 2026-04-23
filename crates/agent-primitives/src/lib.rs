@@ -7,12 +7,7 @@
 
 #![forbid(unsafe_code)]
 
-use std::{
-    collections::HashMap,
-    path::PathBuf,
-    sync::Arc,
-    time::Duration,
-};
+use std::{collections::HashMap, path::PathBuf, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -70,7 +65,11 @@ pub struct StepContext {
 /// or in-memory bodies.
 #[async_trait]
 pub trait Fetcher: Send + Sync {
-    async fn fetch(&self, url: &str, headers: &HashMap<String, String>) -> Result<Vec<u8>, PrimitiveError>;
+    async fn fetch(
+        &self,
+        url: &str,
+        headers: &HashMap<String, String>,
+    ) -> Result<Vec<u8>, PrimitiveError>;
 }
 
 /// Minimal in-memory fetcher used by tests.
@@ -78,7 +77,11 @@ pub struct MemFetcher(pub HashMap<String, Vec<u8>>);
 
 #[async_trait]
 impl Fetcher for MemFetcher {
-    async fn fetch(&self, url: &str, _headers: &HashMap<String, String>) -> Result<Vec<u8>, PrimitiveError> {
+    async fn fetch(
+        &self,
+        url: &str,
+        _headers: &HashMap<String, String>,
+    ) -> Result<Vec<u8>, PrimitiveError> {
         self.0
             .get(url)
             .cloned()
@@ -140,13 +143,12 @@ impl Primitive for FileTransfer {
         ctx: &StepContext,
     ) -> Result<StepResult, PrimitiveError> {
         let started = std::time::Instant::now();
-        let url = params
-            .get("url")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| PrimitiveError::BadParameters {
+        let url = params.get("url").and_then(|v| v.as_str()).ok_or_else(|| {
+            PrimitiveError::BadParameters {
                 primitive: self.name().into(),
                 detail: "missing url".into(),
-            })?;
+            }
+        })?;
         let want_hash = params
             .get("sha256")
             .and_then(|v| v.as_str())
@@ -182,7 +184,10 @@ impl Primitive for FileTransfer {
         hasher.update(&body);
         let got = hex::encode(hasher.finalize());
         if got != want_hash {
-            return Err(PrimitiveError::HashMismatch { want: want_hash, got });
+            return Err(PrimitiveError::HashMismatch {
+                want: want_hash,
+                got,
+            });
         }
 
         if let Some(parent) = dest.parent() {
@@ -331,7 +336,10 @@ impl Primitive for Reboot {
         params: &serde_json::Value,
         _ctx: &StepContext,
     ) -> Result<StepResult, PrimitiveError> {
-        let grace = params.get("grace_seconds").and_then(|v| v.as_u64()).unwrap_or(30);
+        let grace = params
+            .get("grace_seconds")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(30);
         if let Some(p) = self.sentinel_path.parent() {
             fs::create_dir_all(p).await?;
         }
@@ -349,7 +357,10 @@ impl Primitive for Reboot {
             primitive: self.name().into(),
             success: true,
             exit_code: 0,
-            stdout: format!("reboot scheduled (grace={grace}s, sentinel={})", self.sentinel_path.display()),
+            stdout: format!(
+                "reboot scheduled (grace={grace}s, sentinel={})",
+                self.sentinel_path.display()
+            ),
             stderr: String::new(),
             stdout_truncated: false,
             stderr_truncated: false,
@@ -434,7 +445,8 @@ mod tests {
         let dir = tempdir().unwrap();
         let script = dir.path().join("hello.sh");
         std::fs::write(&script, "#!/bin/bash\necho \"hi $OTA_NAME\"\n").unwrap();
-        std::fs::set_permissions(&script, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
+        std::fs::set_permissions(&script, std::os::unix::fs::PermissionsExt::from_mode(0o755))
+            .unwrap();
         let mut h = Sha256::new();
         h.update(std::fs::read(&script).unwrap());
         let want = hex::encode(h.finalize());
@@ -489,10 +501,16 @@ mod tests {
     async fn reboot_writes_sentinel_only() {
         let dir = tempdir().unwrap();
         let sentinel = dir.path().join("reboot.json");
-        let p = Reboot { sentinel_path: sentinel.clone() };
+        let p = Reboot {
+            sentinel_path: sentinel.clone(),
+        };
         let fetcher = Arc::new(MemFetcher(HashMap::new()));
         let res = p
-            .execute("05", &serde_json::json!({"grace_seconds": 10}), &ctx(dir.path(), fetcher))
+            .execute(
+                "05",
+                &serde_json::json!({"grace_seconds": 10}),
+                &ctx(dir.path(), fetcher),
+            )
             .await
             .unwrap();
         assert!(res.success);

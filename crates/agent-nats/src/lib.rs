@@ -33,7 +33,8 @@ pub struct Message {
 pub trait NatsClient: Send + Sync {
     async fn publish(&self, subject: &str, payload: &[u8]) -> Result<(), NatsError>;
     async fn request(&self, subject: &str, payload: &[u8]) -> Result<Vec<u8>, NatsError>;
-    async fn subscribe(&self, subject: &str) -> Result<mpsc::UnboundedReceiver<Message>, NatsError>;
+    async fn subscribe(&self, subject: &str)
+        -> Result<mpsc::UnboundedReceiver<Message>, NatsError>;
 }
 
 /// In-memory bus used by tests and demos.
@@ -45,15 +46,26 @@ pub struct MemBus {
 #[derive(Default)]
 struct MemInner {
     subs: HashMap<String, Vec<mpsc::UnboundedSender<Message>>>,
-    responders: HashMap<String, Arc<dyn Fn(&[u8]) -> Vec<u8> + Send + Sync>>,
+    responders: HashMap<String, Arc<Responder>>,
 }
 
+type Responder = dyn Fn(&[u8]) -> Vec<u8> + Send + Sync;
+
 impl MemBus {
-    pub fn new() -> Arc<Self> { Arc::new(Self::default()) }
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self::default())
+    }
 
     /// Register a synchronous responder for a subject.
-    pub fn respond_with(&self, subject: &str, f: impl Fn(&[u8]) -> Vec<u8> + Send + Sync + 'static) {
-        self.inner.lock().responders.insert(subject.into(), Arc::new(f));
+    pub fn respond_with(
+        &self,
+        subject: &str,
+        f: impl Fn(&[u8]) -> Vec<u8> + Send + Sync + 'static,
+    ) {
+        self.inner
+            .lock()
+            .responders
+            .insert(subject.into(), Arc::new(f));
     }
 }
 
@@ -65,7 +77,10 @@ impl NatsClient for MemBus {
             inner.subs.get(subject).cloned().unwrap_or_default()
         };
         for s in subs {
-            let _ = s.send(Message { subject: subject.into(), payload: payload.to_vec() });
+            let _ = s.send(Message {
+                subject: subject.into(),
+                payload: payload.to_vec(),
+            });
         }
         Ok(())
     }
@@ -77,9 +92,17 @@ impl NatsClient for MemBus {
         let f = resp.ok_or_else(|| NatsError::NoResponder(subject.into()))?;
         Ok(f(payload))
     }
-    async fn subscribe(&self, subject: &str) -> Result<mpsc::UnboundedReceiver<Message>, NatsError> {
+    async fn subscribe(
+        &self,
+        subject: &str,
+    ) -> Result<mpsc::UnboundedReceiver<Message>, NatsError> {
         let (tx, rx) = mpsc::unbounded_channel();
-        self.inner.lock().subs.entry(subject.into()).or_default().push(tx);
+        self.inner
+            .lock()
+            .subs
+            .entry(subject.into())
+            .or_default()
+            .push(tx);
         Ok(rx)
     }
 }

@@ -46,7 +46,9 @@ pub enum VerifyError {
     Schema(String),
     #[error("unknown primitive `{0}` (§5.8 rule 6)")]
     UnknownPrimitive(String),
-    #[error("artifact `{0}` referenced by step but not present in artifacts[] (§5.8 rule 7 / FR-29)")]
+    #[error(
+        "artifact `{0}` referenced by step but not present in artifacts[] (§5.8 rule 7 / FR-29)"
+    )]
     MissingArtifact(String),
     #[error("artifact hash mismatch for `{0}` between step and pin index (§5.8 rule 8)")]
     HashMismatch(String),
@@ -64,7 +66,11 @@ impl TrustStore {
     }
 
     /// Register a key from raw 32-byte ed25519 public-key bytes.
-    pub fn register_raw(&mut self, kid: impl Into<String>, raw: [u8; 32]) -> Result<(), VerifyError> {
+    pub fn register_raw(
+        &mut self,
+        kid: impl Into<String>,
+        raw: [u8; 32],
+    ) -> Result<(), VerifyError> {
         let kid = kid.into();
         let vk = VerifyingKey::from_bytes(&raw).map_err(|_| VerifyError::BadKey(kid.clone()))?;
         self.keys.insert(kid, vk);
@@ -104,9 +110,15 @@ pub fn verify(
 ) -> Result<VerifiedManifest, VerifyError> {
     // Split.
     let mut parts = jws_compact.split('.');
-    let h_b64 = parts.next().ok_or(VerifyError::Malformed("missing header"))?;
-    let p_b64 = parts.next().ok_or(VerifyError::Malformed("missing payload"))?;
-    let s_b64 = parts.next().ok_or(VerifyError::Malformed("missing signature"))?;
+    let h_b64 = parts
+        .next()
+        .ok_or(VerifyError::Malformed("missing header"))?;
+    let p_b64 = parts
+        .next()
+        .ok_or(VerifyError::Malformed("missing payload"))?;
+    let s_b64 = parts
+        .next()
+        .ok_or(VerifyError::Malformed("missing signature"))?;
     if parts.next().is_some() {
         return Err(VerifyError::Malformed("too many parts"));
     }
@@ -154,11 +166,17 @@ pub fn verify(
     h.update(p_b64.as_bytes());
     let manifest_hash = hex::encode(h.finalize());
 
-    Ok(VerifiedManifest { header, payload, manifest_hash })
+    Ok(VerifiedManifest {
+        header,
+        payload,
+        manifest_hash,
+    })
 }
 
 fn schema_check(payload: &serde_json::Value) -> Result<(), VerifyError> {
-    let obj = payload.as_object().ok_or_else(|| VerifyError::Schema("payload is not an object".into()))?;
+    let obj = payload
+        .as_object()
+        .ok_or_else(|| VerifyError::Schema("payload is not an object".into()))?;
     for required in [
         "schema_version",
         "deployment_id",
@@ -170,12 +188,19 @@ fn schema_check(payload: &serde_json::Value) -> Result<(), VerifyError> {
         "deployment_steps",
     ] {
         if !obj.contains_key(required) {
-            return Err(VerifyError::Schema(format!("missing required field `{required}`")));
+            return Err(VerifyError::Schema(format!(
+                "missing required field `{required}`"
+            )));
         }
     }
-    let v = obj.get("schema_version").and_then(|v| v.as_u64()).unwrap_or(0);
+    let v = obj
+        .get("schema_version")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
     if v != 1 {
-        return Err(VerifyError::Schema(format!("unsupported schema_version {v}")));
+        return Err(VerifyError::Schema(format!(
+            "unsupported schema_version {v}"
+        )));
     }
     Ok(())
 }
@@ -214,8 +239,16 @@ fn artifacts_pin_check(payload: &serde_json::Value) -> Result<(), VerifyError> {
         })
         .unwrap_or_default();
 
-    let steps = payload.get("deployment_steps").and_then(|v| v.as_array()).cloned().unwrap_or_default();
-    let rb = payload.get("rollback_steps").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+    let steps = payload
+        .get("deployment_steps")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let rb = payload
+        .get("rollback_steps")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
     for step in steps.iter().chain(rb.iter()) {
         let params = step.get("parameters").and_then(|v| v.as_object());
         let prim = step.get("primitive").and_then(|v| v.as_str()).unwrap_or("");
@@ -228,7 +261,10 @@ fn artifacts_pin_check(payload: &serde_json::Value) -> Result<(), VerifyError> {
         };
         if let Some(p) = params {
             for (name_key, hash_key) in candidates {
-                if let (Some(n), Some(h)) = (p.get(*name_key).and_then(|v| v.as_str()), p.get(*hash_key).and_then(|v| v.as_str())) {
+                if let (Some(n), Some(h)) = (
+                    p.get(*name_key).and_then(|v| v.as_str()),
+                    p.get(*hash_key).and_then(|v| v.as_str()),
+                ) {
                     if let Some(pinned) = pins.get(n) {
                         if pinned != h {
                             return Err(VerifyError::HashMismatch(n.to_string()));
@@ -254,9 +290,7 @@ pub fn jcs(value: &serde_json::Value) -> Result<Vec<u8>, VerifyError> {
 fn write_jcs(out: &mut Vec<u8>, v: &serde_json::Value) -> Result<(), VerifyError> {
     match v {
         serde_json::Value::Null => out.extend_from_slice(b"null"),
-        serde_json::Value::Bool(b) => {
-            out.extend_from_slice(if *b { b"true" } else { b"false" })
-        }
+        serde_json::Value::Bool(b) => out.extend_from_slice(if *b { b"true" } else { b"false" }),
         serde_json::Value::Number(n) => out.extend_from_slice(n.to_string().as_bytes()),
         serde_json::Value::String(s) => write_jcs_string(out, s),
         serde_json::Value::Array(a) => {
@@ -315,7 +349,11 @@ mod tests {
         let p_b64 = URL_SAFE_NO_PAD.encode(&p_bytes);
         let signing_input = format!("{}.{}", h_b64, p_b64);
         let sig: Signature = ed25519_dalek::Signer::sign(sk, signing_input.as_bytes());
-        format!("{}.{}", signing_input, URL_SAFE_NO_PAD.encode(sig.to_bytes()))
+        format!(
+            "{}.{}",
+            signing_input,
+            URL_SAFE_NO_PAD.encode(sig.to_bytes())
+        )
     }
 
     fn good_payload() -> serde_json::Value {
@@ -355,7 +393,10 @@ mod tests {
         let (sk, _) = keypair_from_seed(&[2; 32]);
         let ts = TrustStore::new();
         let jws = sign_compact(&sk, "missing", &good_payload());
-        assert!(matches!(verify(&jws, &ts, &["FILE_TRANSFER"]), Err(VerifyError::UnknownKid(_))));
+        assert!(matches!(
+            verify(&jws, &ts, &["FILE_TRANSFER"]),
+            Err(VerifyError::UnknownKid(_))
+        ));
     }
 
     #[test]
@@ -372,8 +413,15 @@ mod tests {
         let signing_input = format!("{}.{}", h_b64, p_b64);
         let sig = ed25519_dalek::Signer::sign(&sk, signing_input.as_bytes());
         let sig_bytes: Signature = sig;
-        let jws = format!("{}.{}", signing_input, URL_SAFE_NO_PAD.encode(sig_bytes.to_bytes()));
-        assert!(matches!(verify(&jws, &ts, &["FILE_TRANSFER"]), Err(VerifyError::DisallowedAlg(_))));
+        let jws = format!(
+            "{}.{}",
+            signing_input,
+            URL_SAFE_NO_PAD.encode(sig_bytes.to_bytes())
+        );
+        assert!(matches!(
+            verify(&jws, &ts, &["FILE_TRANSFER"]),
+            Err(VerifyError::DisallowedAlg(_))
+        ));
     }
 
     #[test]
@@ -389,7 +437,10 @@ mod tests {
         let alt_b64 = URL_SAFE_NO_PAD.encode(jcs(&altered).unwrap());
         parts[1] = &alt_b64;
         let tampered = parts.join(".");
-        assert!(matches!(verify(&tampered, &ts, &["FILE_TRANSFER"]), Err(VerifyError::BadSignature)));
+        assert!(matches!(
+            verify(&tampered, &ts, &["FILE_TRANSFER"]),
+            Err(VerifyError::BadSignature)
+        ));
     }
 
     #[test]
@@ -400,7 +451,10 @@ mod tests {
         let mut p = good_payload();
         p["deployment_steps"][0]["primitive"] = serde_json::json!("BOGUS");
         let jws = sign_compact(&sk, "k1", &p);
-        assert!(matches!(verify(&jws, &ts, &["FILE_TRANSFER"]), Err(VerifyError::UnknownPrimitive(_))));
+        assert!(matches!(
+            verify(&jws, &ts, &["FILE_TRANSFER"]),
+            Err(VerifyError::UnknownPrimitive(_))
+        ));
     }
 
     #[test]
@@ -427,6 +481,9 @@ mod tests {
     fn jcs_sorts_object_keys() {
         let v = serde_json::json!({"b": 1, "a": 2, "c": [3, 1, 2]});
         let out = jcs(&v).unwrap();
-        assert_eq!(std::str::from_utf8(&out).unwrap(), r#"{"a":2,"b":1,"c":[3,1,2]}"#);
+        assert_eq!(
+            std::str::from_utf8(&out).unwrap(),
+            r#"{"a":2,"b":1,"c":[3,1,2]}"#
+        );
     }
 }

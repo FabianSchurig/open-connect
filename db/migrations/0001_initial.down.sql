@@ -1,0 +1,6 @@
+BEGIN;
+DROP TABLE IF EXISTS audit_deployments;
+DROP TABLE IF EXISTS claim_locks;
+DROP TABLE IF EXISTS claims;
+DROP TABLE IF EXISTS devices;
+COMMIT;

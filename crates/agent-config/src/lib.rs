@@ -25,7 +25,9 @@ pub struct AgentConfig {
     pub tags: Vec<String>,
 }
 
-fn default_poll_interval() -> u64 { 30 }
+fn default_poll_interval() -> u64 {
+    30
+}
 
 impl AgentConfig {
     pub fn from_path(p: impl AsRef<std::path::Path>) -> Result<Self, ConfigError> {

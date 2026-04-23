@@ -22,7 +22,10 @@ pub enum Error {
     #[error("invalid semver: {0}")]
     BadVersion(String),
     #[error("manifest rejected: below lower_limit_version (current {current}, lower_limit {lower_limit})")]
-    BelowLowerLimit { current: String, lower_limit: String },
+    BelowLowerLimit {
+        current: String,
+        lower_limit: String,
+    },
     #[error("manifest rejected: rollback (desired {desired} < max_seen {max_seen}); authorized downgrade not provided")]
     Rollback { desired: String, max_seen: String },
 }
@@ -57,16 +60,24 @@ pub struct EvalInput<'a> {
 
 /// Evaluate the anti-rollback gate against the persisted state.
 pub fn evaluate(state: &PersistedState, input: &EvalInput) -> Result<Decision, Error> {
-    let current = state.current_deployed_version.clone().unwrap_or_else(|| "0.0.0".into());
+    let current = state
+        .current_deployed_version
+        .clone()
+        .unwrap_or_else(|| "0.0.0".into());
     if cmp(&current, input.lower_limit_version)? == std::cmp::Ordering::Less {
         return Ok(Decision::RejectBelowLowerLimit);
     }
-    let max_seen = state.max_seen_version.clone().unwrap_or_else(|| "0.0.0".into());
+    let max_seen = state
+        .max_seen_version
+        .clone()
+        .unwrap_or_else(|| "0.0.0".into());
     if cmp(input.desired_version, &max_seen)? == std::cmp::Ordering::Less {
         // Authorised downgrade path requires ALL three signals (FR-25).
         let authorised = input.allow_downgrade
             && input.downgrade_capable_key
-            && input.downgrade_justification.map_or(false, |s| !s.is_empty());
+            && input
+                .downgrade_justification
+                .is_some_and(|s| !s.is_empty());
         if !authorised {
             return Ok(Decision::RejectRollback);
         }
@@ -90,7 +101,11 @@ fn parse(s: &str) -> Result<(u64, u64, u64), Error> {
             .parse()
             .map_err(|_| Error::BadVersion(s.to_string()))
     };
-    Ok((parse_one(it.next())?, parse_one(it.next())?, parse_one(it.next())?))
+    Ok((
+        parse_one(it.next())?,
+        parse_one(it.next())?,
+        parse_one(it.next())?,
+    ))
 }
 
 /// File-backed store. Writes JSON atomically (tmp + rename).
@@ -101,7 +116,10 @@ pub struct FileStore {
 
 impl FileStore {
     pub fn new(path: impl Into<PathBuf>) -> Self {
-        Self { path: path.into(), cache: Mutex::new(None) }
+        Self {
+            path: path.into(),
+            cache: Mutex::new(None),
+        }
     }
 }
 

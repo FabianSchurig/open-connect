@@ -1,0 +1,25 @@
+{
+    "name": "open-connect",
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+    "features": {
+        "ghcr.io/devcontainers/features/go:1": { "version": "1.24" },
+        "ghcr.io/devcontainers/features/rust:1": {
+            "version": "stable",
+            "targets": "x86_64-unknown-linux-musl,aarch64-unknown-linux-musl",
+            "components": "rustfmt,clippy"
+        },
+        "ghcr.io/devcontainers/features/common-utils:2": { "username": "vscode" }
+    },
+    "postCreateCommand": "bash .devcontainer/postCreate.sh",
+    "remoteUser": "vscode",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "golang.go",
+                "rust-lang.rust-analyzer",
+                "bufbuild.vscode-buf",
+                "tamasfe.even-better-toml"
+            ]
+        }
+    }
+}
