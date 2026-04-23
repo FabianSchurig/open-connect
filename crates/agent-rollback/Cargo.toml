@@ -1,0 +1,12 @@
+[package]
+name = "agent-rollback"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Anti-rollback gate (file-backed; TPM-backed deferred). FR-25/26."
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+parking_lot = { workspace = true }

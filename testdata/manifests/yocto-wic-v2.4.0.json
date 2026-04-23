@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "deployment_id": "11111111-1111-1111-1111-111111111111",
+  "target_serial": "QEMU-DEV-001",
+  "desired_version": "2.4.0",
+  "lower_limit_version": "2.0.0",
+  "allow_downgrade": false,
+  "issued_at": "2026-04-23T12:00:00Z",
+  "requested_by": "release-manager-alice@example.org",
+  "artifacts": [
+    {
+      "name": "core-image-v2.4.0.wic.zst",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "size": 268435456
+    },
+    {
+      "name": "core-image-v2.4.0.wic.bmap",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "size": 8192
+    },
+    {
+      "name": "device-profiles/yocto-wic-ab/flash-wic-to-bank.sh",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+      "size": 4096
+    },
+    {
+      "name": "device-profiles/yocto-wic-ab/update-grubenv.sh",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000004",
+      "size": 2048
+    }
+  ],
+  "deployment_steps": [
+    {
+      "step_id": "01-fetch-wic",
+      "description": "Fetch WIC + bmap from Artifactory",
+      "primitive": "FILE_TRANSFER",
+      "parameters": {
+        "url": "https://artifactory.example.org/yocto/core-image-v2.4.0.wic.zst",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+        "dest_path": "/var/lib/ota/spool/core-image-v2.4.0.wic.zst",
+        "resumable": true
+      },
+      "timeout_seconds": 1800
+    },
+    {
+      "step_id": "02-fetch-bmap",
+      "primitive": "FILE_TRANSFER",
+      "parameters": {
+        "url": "https://artifactory.example.org/yocto/core-image-v2.4.0.wic.bmap",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+        "dest_path": "/var/lib/ota/spool/core-image-v2.4.0.wic.bmap",
+        "resumable": false
+      },
+      "timeout_seconds": 60
+    },
+    {
+      "step_id": "03-flash-wic",
+      "primitive": "SCRIPT_EXECUTION",
+      "parameters": {
+        "interpreter": "/bin/bash",
+        "script_ref": "device-profiles/yocto-wic-ab/flash-wic-to-bank.sh",
+        "script_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+        "env": {
+          "OTA_WIC_PATH": "/var/lib/ota/spool/core-image-v2.4.0.wic.zst",
+          "OTA_BMAP_PATH": "/var/lib/ota/spool/core-image-v2.4.0.wic.bmap",
+          "OTA_TARGET_BANK": "B"
+        }
+      },
+      "timeout_seconds": 900
+    },
+    {
+      "step_id": "04-grubenv",
+      "primitive": "SCRIPT_EXECUTION",
+      "parameters": {
+        "interpreter": "/bin/bash",
+        "script_ref": "device-profiles/yocto-wic-ab/update-grubenv.sh",
+        "script_sha256": "0000000000000000000000000000000000000000000000000000000000000004",
+        "env": {
+          "OTA_BOOT_PART": "B",
+          "OTA_BOOT_COUNT": "3"
+        }
+      },
+      "timeout_seconds": 30
+    },
+    {
+      "step_id": "05-reboot",
+      "primitive": "REBOOT",
+      "parameters": { "grace_seconds": 30 }
+    }
+  ],
+  "rollback_steps": [
+    {
+      "step_id": "r01-restore-grubenv",
+      "primitive": "SCRIPT_EXECUTION",
+      "parameters": {
+        "interpreter": "/bin/bash",
+        "script_ref": "device-profiles/yocto-wic-ab/restore-grubenv.sh",
+        "script_sha256": "0000000000000000000000000000000000000000000000000000000000000005",
+        "env": {}
+      },
+      "timeout_seconds": 30
+    }
+  ]
+}

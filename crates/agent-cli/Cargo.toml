@@ -1,0 +1,24 @@
+[package]
+name = "agent-cli"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Open-Connect edge agent CLI binary."
+
+[[bin]]
+name = "open-connect-agent"
+path = "src/main.rs"
+
+[dependencies]
+agent-core = { path = "../agent-core" }
+agent-config = { path = "../agent-config" }
+agent-nats = { path = "../agent-nats" }
+agent-engine = { path = "../agent-engine" }
+agent-primitives = { path = "../agent-primitives" }
+agent-rollback = { path = "../agent-rollback" }
+manifest-verifier = { path = "../manifest-verifier" }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow = { workspace = true }
+serde_json = { workspace = true }
