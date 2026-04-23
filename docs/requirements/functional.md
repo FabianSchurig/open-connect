@@ -131,9 +131,9 @@ This catalogue lists every functional requirement (FR) for the platform. IDs **F
 - **Verification:** Test — attempt modification through API and at storage layer; assert rejection.
 - **Priority:** Must.
 
-### FR-13 — `SystemdRestart` step with readiness probe *(from UC-02)*
+### FR-13 — `SYSTEM_SERVICE` step with readiness probe *(from UC-02)*
 
-- **Statement:** The execution engine shall provide a `SystemdRestart` step that restarts a configured unit and blocks until either (a) a configurable readiness condition is met (default: unit `active (running)`), or (b) a configurable timeout expires; timeout expiry is treated as step failure.
+- **Statement:** The execution engine shall provide a `SYSTEM_SERVICE` primitive (formerly named `SystemdRestart` in pre-[ADR-0008](../adr/ADR-0008-config-driven-primitive-engine.md) drafts) that performs a configured systemd unit action (`start` / `stop` / `restart`) and blocks until either (a) a configurable readiness condition is met (default: unit `active (running)`), or (b) a configurable timeout expires; timeout expiry is treated as step failure.
 - **Rationale:** Application restarts must be observable and bounded.
 - **Source:** UC-02 step 4 + Err-3.
 - **Verification:** Test — restart a unit that delays activation; assert correct success/timeout behaviour.

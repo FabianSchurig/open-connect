@@ -37,11 +37,11 @@ A critical patch must be deployed to a fleet of ext4-based medical devices. The 
 
 Release Manager submits a new `DesiredState` for the target tag through the Go Control Plane, referencing a modular update flow consisting of:
 
-1. `DownloadArtifact` (pre-signed URL → checksum verified)
-2. `RunScript` (pre-install hook)
-3. `FlashPartition` (write `.img` to inactive bank)
-4. `UpdateGrubEnv` (set `boot_part=B`, `boot_count=0`, `boot_success=0`)
-5. `Reboot`
+1. `FILE_TRANSFER` — fetch the root image via pre-signed URL, SHA-256 verified
+2. `SCRIPT_EXECUTION` — pre-install hook (signed device-profile script)
+3. `SCRIPT_EXECUTION` — write `.img` to inactive bank via the device profile's flash script (the `ext4-partition-ab` profile, see [§5.9](../arc42/05-building-block-view.md#59-boot-redundancy-reference-device-profiles))
+4. `SCRIPT_EXECUTION` — toggle `grubenv` (set `boot_part=B`, `boot_count=N`, `boot_success=0`) via the device profile's grubenv script
+5. `REBOOT`
 
 ## 5. Main Success Flow
 
@@ -82,7 +82,7 @@ Release Manager submits a new `DesiredState` for the target tag through the Go C
 - **Post-Condition:** Device is running pre-update Bank A; audit log records automatic revert.
 
 ### Err-4 — Artifact checksum mismatch
-- 5d. `DownloadArtifact` step fails on checksum compare; treated as Err-2.
+- 5d. `FILE_TRANSFER` step fails on checksum compare; treated as Err-2.
 
 ## 7. Derived Requirements
 
@@ -96,8 +96,8 @@ Release Manager submits a new `DesiredState` for the target tag through the Go C
 ## 8. Related Architecture
 
 - Sequence diagram: [arc42 §06 — UC-01 sequence](../arc42/06-runtime-view.md#uc-01--ab-ota-medical-update)
-- Components touched: Manifest Verifier, Execution Engine, Partition Manager, GRUB Manager, Telemetry, Audit Service, RBAC.
-- ADRs: [ADR-0003 JWS/Ed25519](../adr/ADR-0003-jws-ed25519-manifests.md), [ADR-0004 A/B + grubenv](../adr/ADR-0004-ab-partitioning-grubenv.md), [ADR-0007 Protobuf](../adr/ADR-0007-protobuf-contracts.md)
+- Components touched: Manifest Verifier, Config-Driven Execution Engine + primitive set ([§5.3](../arc42/05-building-block-view.md#53-level-2--rust-edge-agent-whitebox)), signed device-profile scripts (`ext4-partition-ab` profile, [§5.9](../arc42/05-building-block-view.md#59-boot-redundancy-reference-device-profiles)), Telemetry, Audit Service, RBAC.
+- ADRs: [ADR-0003 JWS/Ed25519](../adr/ADR-0003-jws-ed25519-manifests.md), [ADR-0004 A/B + grubenv](../adr/ADR-0004-ab-partitioning-grubenv.md), [ADR-0007 Protobuf](../adr/ADR-0007-protobuf-contracts.md), [ADR-0008 Config-driven primitives](../adr/ADR-0008-config-driven-primitive-engine.md)
 
 ## 9. Open Issues
 

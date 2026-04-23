@@ -35,10 +35,10 @@ An engineer needs to deploy a specific combination of AI models and ROS2 nodes t
 
 Engineer publishes a new `DesiredState` containing a modular flow:
 
-1. `RunScript` — stop current ROS2 nodes (`systemctl stop ros2-app.service`)
-2. `DownloadArtifact` — fetch new neural-network weights to a versioned path under `/var/lib/ota/models/<version>/`
-3. `RunCommand` — atomic symlink swap to new model
-4. `SystemdRestart` — restart `ros2-app.service`
+1. `SCRIPT_EXECUTION` — stop current ROS2 nodes (`systemctl stop ros2-app.service`)
+2. `FILE_TRANSFER` — fetch new neural-network weights to a versioned path under `/var/lib/ota/models/<version>/`
+3. `SCRIPT_EXECUTION` — atomic symlink swap to new model
+4. `SYSTEM_SERVICE` — restart `ros2-app.service`
 
 ## 5. Main Success Flow
 
@@ -48,7 +48,7 @@ Engineer publishes a new `DesiredState` containing a modular flow:
 4. Edge Agent fetches the manifest via local Leaf request-reply (low-latency, in-LAN).
 5. Agent verifies JWS signature. *(FR-10)*
 6. Agent executes steps 1–4 sequentially, capturing per-step logs and emitting `StepResult` after each. *(FR-01)*
-7. After `SystemdRestart`, the agent waits for `ros2-app.service` to reach `active (running)` within a configurable timeout.
+7. After the `SYSTEM_SERVICE` restart, the agent waits for `ros2-app.service` to reach `active (running)` within a configurable timeout.
 8. Agent publishes a final cryptographic acknowledgment `(device_serial, manifest_hash, model_version, node_revision, timestamp, signature)` on `audit.deployment.<deployment_id>`. *(NFR-01)*
 
 **Post-Condition (success):** Robot is running new ROS2 nodes against new model weights; OS partitions are untouched; audit trail is complete.
@@ -63,7 +63,7 @@ Engineer publishes a new `DesiredState` containing a modular flow:
 ### Alt-2 — Local ROS2 communication during cloud outage
 - The robot's local ROS2 nodes continue to publish to the **local Leaf Node** without cloud dependency. Operators on the robot's LAN can still observe topics. *(NFR-04)*
 
-### Err-1 — `RunScript` to stop ROS2 nodes returns non-zero
+### Err-1 — `SCRIPT_EXECUTION` to stop ROS2 nodes returns non-zero
 - Agent halts the sequence, does not download or restart anything. *(FR-02)*
 - Agent publishes `StepResult{success=false}` and remains on previous configuration.
 
@@ -78,10 +78,10 @@ Engineer publishes a new `DesiredState` containing a modular flow:
 - **Functional:** FR-01, FR-02, FR-10
 - **Non-Functional:** NFR-01, NFR-02, NFR-04
 - **New requirements raised by walkthrough:**
-  - FR-13 *(new)* — Agent must support a `SystemdRestart` step type with a configurable readiness timeout and readiness probe (default: unit `active (running)`).
+  - FR-13 *(new)* — Agent must support a `SYSTEM_SERVICE` primitive with a configurable readiness timeout and readiness probe (default: unit `active (running)`).
   - FR-14 *(new)* — Modular flows shall support application-only updates (no partition writes, no reboot).
   - NFR-06 *(new)* — Robots must remain operable on local ROS2 traffic during cloud outages of up to 24 hours; telemetry buffering shall be bounded by configured local disk quota.
-  - NFR-07 *(new)* — `DownloadArtifact` shall support resumable downloads where the artifact server advertises HTTP `Range`.
+  - NFR-07 *(new)* — `FILE_TRANSFER` shall support resumable downloads where the artifact server advertises HTTP `Range`.
 
 ## 8. Related Architecture
 
