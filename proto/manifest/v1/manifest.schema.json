@@ -1,0 +1,88 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/FabianSchurig/open-connect/proto/manifest/v1/manifest.schema.json",
+  "title": "Open-Connect Desired-State Manifest (JWS payload)",
+  "description": "JSON schema for the JWS payload defined in arc42 §5.4.1. The payload is JCS-canonicalised before being signed (RFC 8785). Validators MUST reject manifests that do not conform.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "deployment_id",
+    "desired_version",
+    "lower_limit_version",
+    "issued_at",
+    "requested_by",
+    "artifacts",
+    "deployment_steps"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "deployment_id": { "type": "string", "minLength": 1 },
+    "target_serial": { "type": ["string", "null"] },
+    "target_tag": { "type": ["string", "null"] },
+    "desired_version": { "$ref": "#/definitions/semver" },
+    "lower_limit_version": { "$ref": "#/definitions/semver" },
+    "allow_downgrade": { "type": "boolean", "default": false },
+    "downgrade_justification": { "type": ["string", "null"] },
+    "issued_at": { "type": "string", "format": "date-time" },
+    "requested_by": { "type": "string", "minLength": 1 },
+    "artifacts": {
+      "type": "array",
+      "minItems": 0,
+      "items": { "$ref": "#/definitions/artifact" }
+    },
+    "deployment_steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/step" }
+    },
+    "rollback_steps": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/step" }
+    }
+  },
+  "definitions": {
+    "semver": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "artifact": {
+      "type": "object",
+      "required": ["name", "sha256", "size"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/definitions/sha256" },
+        "size": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "step": {
+      "type": "object",
+      "required": ["step_id", "primitive", "parameters"],
+      "additionalProperties": false,
+      "properties": {
+        "step_id": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "primitive": {
+          "type": "string",
+          "enum": [
+            "SCRIPT_EXECUTION",
+            "FILE_TRANSFER",
+            "SYSTEM_SERVICE",
+            "DOCKER_CONTAINER",
+            "AGENT_SELF_UPDATE",
+            "REBOOT"
+          ]
+        },
+        "applies_if": { "type": ["object", "null"] },
+        "parameters": { "type": "object" },
+        "timeout_seconds": { "type": "integer", "minimum": 1 },
+        "continue_on_error": { "type": "boolean", "default": false }
+      }
+    }
+  }
+}

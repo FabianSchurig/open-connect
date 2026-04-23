@@ -1,0 +1,12 @@
+version: v2
+modules:
+  - path: proto
+lint:
+  use:
+    - STANDARD
+  except:
+    # Allow short package names (otap.v1).
+    - PACKAGE_VERSION_SUFFIX
+breaking:
+  use:
+    - WIRE_JSON
