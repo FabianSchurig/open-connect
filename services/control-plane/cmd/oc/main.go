@@ -115,7 +115,7 @@ func cmdWait(args []string) error {
 		return errors.New("usage: oc claim wait <id> [flags]")
 	}
 	id := fs.Arg(0)
-	target := strings.Title(strings.ToLower(*until))
+	target := titleCase(*until)
 	deadline := time.Now().Add(*timeout)
 	for time.Now().Before(deadline) {
 		out, err := request("GET", "/v1/claims/"+id, nil)
@@ -139,6 +139,21 @@ func cmdRelease(args []string) error {
 	}
 	_, err := request("DELETE", "/v1/claims/"+args[0], nil)
 	return err
+}
+
+// titleCase returns s with the first ASCII letter upper-cased and the rest
+// lower-cased. (We only ever pass tiny state names like "ready" / "locked".)
+// Avoids the Go-1.18-deprecated strings.Title.
+func titleCase(s string) string {
+	s = strings.ToLower(s)
+	if s == "" {
+		return s
+	}
+	b := []byte(s)
+	if b[0] >= 'a' && b[0] <= 'z' {
+		b[0] -= 'a' - 'A'
+	}
+	return string(b)
 }
 
 func request(method, path string, body any) ([]byte, error) {
