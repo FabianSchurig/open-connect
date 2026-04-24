@@ -69,3 +69,18 @@ func TestJCS_NestedObjects(t *testing.T) {
 		t.Fatalf("nested not sorted: %s", got)
 	}
 }
+
+// Regression test: HTML-significant characters must be emitted literally
+// (RFC 8785 §3.2.2.2). Go's default json.Marshal escapes them as \u003c,
+// \u003e, \u0026, which would break cross-language verification against
+// the Rust verifier.
+func TestJCS_NoHTMLEscaping(t *testing.T) {
+	got, err := JCS(map[string]any{"k": "<a>&\"b\""})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `{"k":"<a>&\"b\""}`
+	if string(got) != want {
+		t.Fatalf("html chars escaped:\nhave %s\nwant %s", got, want)
+	}
+}

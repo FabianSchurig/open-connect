@@ -86,7 +86,8 @@ func TestSweep_ForceReleaseExpiredClaim(t *testing.T) {
 	_, _ = svc.ReportDeviceState(c.ID, "lease-1", DeviceReady)
 	_, _ = svc.ReportDeviceState(c.ID, "lease-1", DeviceInUse)
 
-	// Skip past TTL by 31s — well within the 30s budget for sweep latency.
+	// Advance well past the 10s TTL so the sweep MUST force-release the
+	// claim (NFR-08: release latency budget is 30s past expiry).
 	clk.Add(41 * time.Second)
 	released, _ := svc.Sweep()
 	if released == 0 {

@@ -75,9 +75,7 @@ pub fn evaluate(state: &PersistedState, input: &EvalInput) -> Result<Decision, E
         // Authorised downgrade path requires ALL three signals (FR-25).
         let authorised = input.allow_downgrade
             && input.downgrade_capable_key
-            && input
-                .downgrade_justification
-                .is_some_and(|s| !s.is_empty());
+            && input.downgrade_justification.is_some_and(|s| !s.is_empty());
         if !authorised {
             return Ok(Decision::RejectRollback);
         }

@@ -170,13 +170,22 @@ func jcsEncode(buf *bytes.Buffer, v any) error {
 }
 
 func encodeJSONString(buf *bytes.Buffer, s string) error {
-	// json.Marshal of a string produces the canonical RFC 8259 form
-	// (escapes <0x20, ", \, /). That matches RFC 8785 §3.2 for ASCII.
-	b, err := json.Marshal(s)
-	if err != nil {
+	// Use a json.Encoder with HTML escaping disabled so that '<', '>', '&'
+	// are emitted as literal characters (RFC 8785 §3.2.2.2 / RFC 8259 §7),
+	// matching the Rust verifier's output and avoiding cross-language
+	// canonicalisation drift. json.Encoder also appends a trailing newline
+	// which we strip.
+	var tmp bytes.Buffer
+	enc := json.NewEncoder(&tmp)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(s); err != nil {
 		return err
 	}
-	buf.Write(b)
+	out := tmp.Bytes()
+	if n := len(out); n > 0 && out[n-1] == '\n' {
+		out = out[:n-1]
+	}
+	buf.Write(out)
 	return nil
 }
 

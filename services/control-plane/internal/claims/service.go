@@ -130,7 +130,8 @@ func (s *Service) Create(req CreateRequest) (*Claim, error) {
 	if req.Count == 0 {
 		return nil, fmt.Errorf("count must be >= 1")
 	}
-	if len(req.RequiredTags) == 0 {
+	tags := uniqueSortedTags(req.RequiredTags)
+	if len(tags) == 0 {
 		return nil, fmt.Errorf("required_tags must be non-empty")
 	}
 	if req.TTL <= 0 {
@@ -140,7 +141,7 @@ func (s *Service) Create(req CreateRequest) (*Claim, error) {
 	c := &Claim{
 		ID:                 s.idGen(),
 		Count:              req.Count,
-		RequiredTags:       append([]string(nil), req.RequiredTags...),
+		RequiredTags:       tags,
 		DesiredVersion:     req.DesiredVersion,
 		TTL:                req.TTL,
 		PreparationTimeout: req.PreparationTimeout,
@@ -150,12 +151,30 @@ func (s *Service) Create(req CreateRequest) (*Claim, error) {
 		ExpiresAt:          now.Add(req.TTL),
 		Devices:            map[string]*DeviceLock{},
 	}
-	sort.Strings(c.RequiredTags)
 	s.mu.Lock()
 	s.claims[c.ID] = c
 	s.mu.Unlock()
 	s.publishOffer(c)
 	return c.cloneLocked(), nil
+}
+
+// uniqueSortedTags drops empty strings, deduplicates, and sorts the result so
+// that downstream NATS subjects (claim.offer.<tag>) are stable and never
+// include the empty subject "claim.offer.".
+func uniqueSortedTags(in []string) []string {
+	set := map[string]struct{}{}
+	for _, t := range in {
+		if t == "" {
+			continue
+		}
+		set[t] = struct{}{}
+	}
+	out := make([]string, 0, len(set))
+	for t := range set {
+		out = append(out, t)
+	}
+	sort.Strings(out)
+	return out
 }
 
 type CreateRequest struct {

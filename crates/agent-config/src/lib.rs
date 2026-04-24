@@ -47,11 +47,11 @@ control_plane_url = "https://control.example/"
 trust_store_dir = "/etc/ota/trust-store"
 spool_dir = "/var/lib/ota/spool"
 anti_rollback_path = "/var/lib/persistent/anti-rollback.json"
-tags = ["yocto-wic-ab", "x86"]
+tags = ["profile-a", "x86"]
 "#;
         let c: AgentConfig = toml::from_str(toml).unwrap();
         assert_eq!(c.serial, "DEV-1");
         assert_eq!(c.poll_interval_seconds, 30);
-        assert_eq!(c.tags, vec!["yocto-wic-ab".to_string(), "x86".into()]);
+        assert_eq!(c.tags, vec!["profile-a".to_string(), "x86".into()]);
     }
 }

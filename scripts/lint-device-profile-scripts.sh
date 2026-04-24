@@ -8,7 +8,11 @@
 #   - `trap cleanup EXIT`
 #   - no `reboot`, `shutdown`, `systemctl reboot`, `systemctl poweroff`
 #   - no writes to `/var/log`
-#   - all referenced env-vars start with `OTA_` (best-effort grep)
+#
+# NOTE: we deliberately do *not* try to enforce that every referenced env-var
+# starts with `OTA_` — a robust grep is brittle (env-vars come from sourced
+# helpers, indirect expansion, etc.). The agent enforces the `OTA_*` rule at
+# runtime in `agent-primitives/src/script_execution.rs` (FR-30).
 
 set -euo pipefail
 
@@ -28,10 +32,11 @@ for f in "$@"; do
         || err "$f: missing 'trap cleanup EXIT'"
 
     # Strip comment-only lines and trailing inline comments before scanning
-    # for forbidden tokens.
-    code_only=$(sed -E 's/[[:space:]]*#.*$//' "$f" | grep -vE '^\s*$' || true)
+    # for forbidden tokens. Use POSIX character classes — grep -E does not
+    # support \s or \b portably (\b is a literal backspace under ERE).
+    code_only=$(sed -E 's/[[:space:]]*#.*$//' "$f" | grep -vE '^[[:space:]]*$' || true)
 
-    if printf '%s\n' "$code_only" | grep -qE '(^|[^a-zA-Z_])(reboot|shutdown|systemctl[[:space:]]+(reboot|poweroff|halt))(\b|[^a-zA-Z_])'; then
+    if printf '%s\n' "$code_only" | grep -qE '(^|[^a-zA-Z_])(reboot|shutdown|systemctl[[:space:]]+(reboot|poweroff|halt))($|[^a-zA-Z_])'; then
         err "$f: forbidden reboot/shutdown call (use REBOOT primitive)"
     fi
 

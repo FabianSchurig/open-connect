@@ -253,31 +253,59 @@ fn artifacts_pin_check(payload: &serde_json::Value) -> Result<(), VerifyError> {
         let params = step.get("parameters").and_then(|v| v.as_object());
         let prim = step.get("primitive").and_then(|v| v.as_str()).unwrap_or("");
 
-        // Look at common artifact-bearing fields.
-        let candidates: &[(&str, &str)] = match prim {
-            "FILE_TRANSFER" => &[("dest_artifact", "sha256")],
-            "SCRIPT_EXECUTION" => &[("script_ref", "script_sha256")],
-            _ => &[],
-        };
-        if let Some(p) = params {
-            for (name_key, hash_key) in candidates {
-                if let (Some(n), Some(h)) = (
-                    p.get(*name_key).and_then(|v| v.as_str()),
-                    p.get(*hash_key).and_then(|v| v.as_str()),
-                ) {
-                    if let Some(pinned) = pins.get(n) {
-                        if pinned != h {
-                            return Err(VerifyError::HashMismatch(n.to_string()));
-                        }
-                    } else {
-                        return Err(VerifyError::MissingArtifact(n.to_string()));
-                    }
+        let Some(p) = params else { continue };
+
+        // (artifact-name, hash) candidates per primitive. For FILE_TRANSFER
+        // the artifact name in `artifacts[]` matches `basename(dest_path)`
+        // (see the example manifest in testdata/manifests/), and the hash
+        // travels in the `sha256` parameter alongside the URL.
+        let candidates: Vec<(String, String)> = match prim {
+            "FILE_TRANSFER" => {
+                let name = p
+                    .get("dest_path")
+                    .and_then(|v| v.as_str())
+                    .map(basename)
+                    .map(|s| s.to_string());
+                let hash = p
+                    .get("sha256")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                match (name, hash) {
+                    (Some(n), Some(h)) => vec![(n, h)],
+                    _ => vec![],
                 }
             }
-            // FILE_TRANSFER also pins by name="basename(dest_path)" via sha256 — relax in MVP.
+            "SCRIPT_EXECUTION" => {
+                let name = p
+                    .get("script_ref")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let hash = p
+                    .get("script_sha256")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                match (name, hash) {
+                    (Some(n), Some(h)) => vec![(n, h)],
+                    _ => vec![],
+                }
+            }
+            _ => vec![],
+        };
+        for (name, hash) in candidates {
+            if let Some(pinned) = pins.get(&name) {
+                if pinned != &hash {
+                    return Err(VerifyError::HashMismatch(name));
+                }
+            } else {
+                return Err(VerifyError::MissingArtifact(name));
+            }
         }
     }
     Ok(())
+}
+
+fn basename(path: &str) -> &str {
+    path.rsplit('/').next().unwrap_or(path)
 }
 
 /// JCS (RFC 8785) — minimal implementation matching the Go side.
@@ -365,7 +393,7 @@ mod tests {
             "issued_at": "2026-04-23T12:00:00Z",
             "requested_by": "alice",
             "artifacts": [
-                {"name": "wic", "sha256": "aa", "size": 1}
+                {"name": "x", "sha256": "aa", "size": 1}
             ],
             "deployment_steps": [
                 {

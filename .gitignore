@@ -33,5 +33,9 @@ coverage.txt
 testdata/tmp/
 *.log
 
+# Local-only signing keys for `oc-sign` development (see testdata/keys/README.md).
+# Private keys must NEVER be committed.
+testdata/keys/*.pem
+
 # Rust analyzer
 **/.rust-analyzer/

@@ -7,7 +7,10 @@
 // during MVP scaffolding.
 package nats
 
-import "sync"
+import (
+	"fmt"
+	"sync"
+)
 
 // Publisher publishes a payload on a NATS subject. Implementations MUST be
 // safe for concurrent use.
@@ -48,7 +51,9 @@ func (m *MemBus) Request(subject string, payload []byte) ([]byte, error) {
 	reply, ok := m.Replies[subject]
 	m.mu.Unlock()
 	if !ok {
-		return nil, nil
+		// Distinguish "no responder registered" from a real nil payload so
+		// that test bugs surface instead of silently returning empty data.
+		return nil, fmt.Errorf("nats mem-bus: no responder for subject %q", subject)
 	}
 	return reply(payload), nil
 }

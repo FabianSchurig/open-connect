@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -124,7 +125,11 @@ func (s *Server) getDevice(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) listDevices(w http.ResponseWriter, r *http.Request) {
 	tags := r.URL.Query()["tag"]
-	got, _ := s.Devices.List(tags)
+	got, err := s.Devices.List(tags)
+	if err != nil {
+		httperr.Write(w, http.StatusInternalServerError, "list failed", err.Error())
+		return
+	}
 	out := make([]deviceDTO, 0, len(got))
 	for _, d := range got {
 		out = append(out, toDeviceDTO(d))
@@ -190,6 +195,9 @@ func toClaimDTO(c *claims.Claim) claimDTO {
 			Serial: dl.Serial, State: string(dl.State), LastUpdate: dl.UpdatedAt,
 		})
 	}
+	// Stable order — map iteration is non-deterministic and would make
+	// API responses (and test assertions) flaky.
+	sort.Slice(d, func(i, j int) bool { return d[i].Serial < d[j].Serial })
 	return claimDTO{
 		ID: c.ID, State: string(c.State), Count: c.Count,
 		RequiredTags: c.RequiredTags, DesiredVersion: c.DesiredVersion,
