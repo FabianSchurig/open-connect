@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    name: Go
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          check-latest: true
+      - name: go vet
+        run: go vet ./...
+      - name: go test (race + cover)
+        run: go test -race -coverprofile=coverage.out ./...
+      - name: upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-coverage
+          path: coverage.out
+          if-no-files-found: ignore
+
+  rust:
+    name: Rust
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo fmt
+        run: cargo fmt --all -- --check
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: cargo test
+        run: cargo test --workspace --all-targets
+
+  fr30-lint:
+    name: FR-30 device-profile lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: lint device-profile scripts
+        run: bash scripts/lint-device-profile-scripts.sh device-profiles/*/*.sh
+
+  fr24-forbidden-tokens:
+    name: FR-24 forbidden tokens
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: forbid distro/bootloader-specific tokens in agent crates
+        # Per ADR-0008 + FR-24, the agent must not contain hardcoded
+        # references to GRUB, ext4, Btrfs, systemd-boot, U-Boot, or any
+        # distro-specific identifier. All such intelligence is delivered as
+        # signed SCRIPT_EXECUTION primitives (Epic O).
+        # Comments referencing these names are excluded; only code lines fail.
+        run: |
+          set -euo pipefail
+          forbidden='\b(grub|grubenv|ext4|btrfs|systemd-boot|u-boot|uboot|yocto)\b'
+          # Strip line and block comments before scanning.
+          fail=0
+          while IFS= read -r -d '' f; do
+              code=$(sed -E 's://.*$::g' "$f" | sed -E '/^\s*\/\*/,/\*\//d')
+              if echo "$code" | grep -iqE "$forbidden"; then
+                  echo "FR-24 violation in $f:"
+                  echo "$code" | grep -inE "$forbidden" | head -10
+                  fail=1
+              fi
+          done < <(find crates/agent-core crates/agent-engine crates/agent-primitives crates/agent-cli crates/agent-config crates/agent-nats crates/agent-rollback -type f -name '*.rs' -print0)
+          if [[ "$fail" -ne 0 ]]; then
+              echo "FR-24 forbidden-tokens check FAILED" >&2
+              exit 1
+          fi
+          echo "FR-24 forbidden-tokens check passed"
